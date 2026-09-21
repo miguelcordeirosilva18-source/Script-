@@ -1,0 +1,655 @@
+--// PLAY COORDINATES HUB
+--// Coordenadas + Gravar + Copy + Click + Fly
+--// Mobile
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local flying = false
+local flyConnection
+local bodyVelocity
+local bodyGyro
+
+local lastCoordinate = ""
+local savedCoordinate = ""
+local clickedCoordinate = ""
+
+local vertical = 0
+local clickMode = false
+local flySpeed = 70
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "PlayCoordinatesHub"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0,310,0,360)
+main.Position = UDim2.new(.5,-155,.5,-180)
+main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0,14)
+corner.Parent = main
+
+--------------------------------------------------
+-- TÍTULO
+--------------------------------------------------
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,-20,0,30)
+title.Position = UDim2.new(0,10,0,5)
+title.BackgroundTransparency = 1
+title.Text = "📍 PLAY COORDINATES"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 17
+title.Parent = main
+
+--------------------------------------------------
+-- COORDENADA ATUAL
+--------------------------------------------------
+
+local current = Instance.new("TextLabel")
+current.Size = UDim2.new(1,-20,0,38)
+current.Position = UDim2.new(0,10,0,40)
+current.BackgroundColor3 = Color3.fromRGB(35,35,35)
+current.TextColor3 = Color3.fromRGB(100,200,255)
+current.Font = Enum.Font.Gotham
+current.TextSize = 12
+current.Text = "X: 0 | Y: 0 | Z: 0"
+current.Parent = main
+
+local currentCorner = Instance.new("UICorner")
+currentCorner.CornerRadius = UDim.new(0,8)
+currentCorner.Parent = current
+
+--------------------------------------------------
+-- GRAVAR
+--------------------------------------------------
+
+local save = Instance.new("TextButton")
+save.Size = UDim2.new(0,140,0,35)
+save.Position = UDim2.new(0,10,0,85)
+save.BackgroundColor3 = Color3.fromRGB(45,170,90)
+save.Text = "💾 GRAVAR"
+save.TextColor3 = Color3.new(1,1,1)
+save.Font = Enum.Font.GothamBold
+save.TextSize = 14
+save.Parent = main
+
+local saveCorner = Instance.new("UICorner")
+saveCorner.CornerRadius = UDim.new(0,8)
+saveCorner.Parent = save
+
+--------------------------------------------------
+-- COPY
+--------------------------------------------------
+
+local copy = Instance.new("TextButton")
+copy.Size = UDim2.new(0,140,0,35)
+copy.Position = UDim2.new(1,-150,0,85)
+copy.BackgroundColor3 = Color3.fromRGB(45,120,255)
+copy.Text = "📋 COPY"
+copy.TextColor3 = Color3.new(1,1,1)
+copy.Font = Enum.Font.GothamBold
+copy.TextSize = 14
+copy.Parent = main
+
+local copyCorner = Instance.new("UICorner")
+copyCorner.CornerRadius = UDim.new(0,8)
+copyCorner.Parent = copy
+
+--------------------------------------------------
+-- COORDENADA SALVA
+--------------------------------------------------
+
+local saved = Instance.new("TextLabel")
+saved.Size = UDim2.new(1,-20,0,45)
+saved.Position = UDim2.new(0,10,0,128)
+saved.BackgroundColor3 = Color3.fromRGB(30,30,30)
+saved.TextColor3 = Color3.fromRGB(255,220,100)
+saved.Font = Enum.Font.GothamBold
+saved.TextSize = 11
+saved.TextWrapped = true
+saved.Text = "SALVA: Nenhuma"
+saved.Parent = main
+
+local savedCorner = Instance.new("UICorner")
+savedCorner.CornerRadius = UDim.new(0,8)
+savedCorner.Parent = saved
+
+--------------------------------------------------
+-- CLICK
+--------------------------------------------------
+
+local clickButton = Instance.new("TextButton")
+clickButton.Size = UDim2.new(0,140,0,35)
+clickButton.Position = UDim2.new(0,10,0,183)
+clickButton.BackgroundColor3 = Color3.fromRGB(140,80,210)
+clickButton.Text = "📍 CLICK"
+clickButton.TextColor3 = Color3.new(1,1,1)
+clickButton.Font = Enum.Font.GothamBold
+clickButton.TextSize = 14
+clickButton.Parent = main
+
+local clickCorner = Instance.new("UICorner")
+clickCorner.CornerRadius = UDim.new(0,8)
+clickCorner.Parent = clickButton
+
+--------------------------------------------------
+-- COPY CLICK
+--------------------------------------------------
+
+local clickCopy = Instance.new("TextButton")
+clickCopy.Size = UDim2.new(0,140,0,35)
+clickCopy.Position = UDim2.new(1,-150,0,183)
+clickCopy.BackgroundColor3 = Color3.fromRGB(45,120,255)
+clickCopy.Text = "📋 COPY CLICK"
+clickCopy.TextColor3 = Color3.new(1,1,1)
+clickCopy.Font = Enum.Font.GothamBold
+clickCopy.TextSize = 12
+clickCopy.Parent = main
+
+local clickCopyCorner = Instance.new("UICorner")
+clickCopyCorner.CornerRadius = UDim.new(0,8)
+clickCopyCorner.Parent = clickCopy
+
+--------------------------------------------------
+-- COORDENADA DO CLICK
+--------------------------------------------------
+
+local clickedLabel = Instance.new("TextLabel")
+clickedLabel.Size = UDim2.new(1,-20,0,42)
+clickedLabel.Position = UDim2.new(0,10,0,226)
+clickedLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
+clickedLabel.TextColor3 = Color3.fromRGB(180,130,255)
+clickedLabel.Font = Enum.Font.GothamBold
+clickedLabel.TextSize = 10
+clickedLabel.TextWrapped = true
+clickedLabel.Text = "CLICK: Nenhuma"
+clickedLabel.Parent = main
+
+local clickedCorner = Instance.new("UICorner")
+clickedCorner.CornerRadius = UDim.new(0,8)
+clickedCorner.Parent = clickedLabel
+
+--------------------------------------------------
+-- VOAR
+--------------------------------------------------
+
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0,140,0,35)
+flyButton.Position = UDim2.new(0,10,0,278)
+flyButton.BackgroundColor3 = Color3.fromRGB(40,180,90)
+flyButton.Text = "🚀 VOAR"
+flyButton.TextColor3 = Color3.new(1,1,1)
+flyButton.Font = Enum.Font.GothamBold
+flyButton.TextSize = 14
+flyButton.Parent = main
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0,8)
+flyCorner.Parent = flyButton
+
+--------------------------------------------------
+-- PARAR
+--------------------------------------------------
+
+local stopButton = Instance.new("TextButton")
+stopButton.Size = UDim2.new(0,140,0,35)
+stopButton.Position = UDim2.new(1,-150,0,278)
+stopButton.BackgroundColor3 = Color3.fromRGB(200,55,55)
+stopButton.Text = "⛔ PARAR"
+stopButton.TextColor3 = Color3.new(1,1,1)
+stopButton.Font = Enum.Font.GothamBold
+stopButton.TextSize = 14
+stopButton.Parent = main
+
+local stopCorner = Instance.new("UICorner")
+stopCorner.CornerRadius = UDim.new(0,8)
+stopCorner.Parent = stopButton
+
+--------------------------------------------------
+-- SUBIR
+--------------------------------------------------
+
+local upButton = Instance.new("TextButton")
+upButton.Size = UDim2.new(0,65,0,30)
+upButton.Position = UDim2.new(0,10,0,318)
+upButton.BackgroundColor3 = Color3.fromRGB(60,150,220)
+upButton.Text = "▲"
+upButton.TextColor3 = Color3.new(1,1,1)
+upButton.Font = Enum.Font.GothamBold
+upButton.TextSize = 18
+upButton.Parent = main
+
+local upCorner = Instance.new("UICorner")
+upCorner.CornerRadius = UDim.new(0,8)
+upCorner.Parent = upButton
+
+--------------------------------------------------
+-- DESCER
+--------------------------------------------------
+
+local downButton = Instance.new("TextButton")
+downButton.Size = UDim2.new(0,65,0,30)
+downButton.Position = UDim2.new(0,85,0,318)
+downButton.BackgroundColor3 = Color3.fromRGB(60,150,220)
+downButton.Text = "▼"
+downButton.TextColor3 = Color3.new(1,1,1)
+downButton.Font = Enum.Font.GothamBold
+downButton.TextSize = 18
+downButton.Parent = main
+
+local downCorner = Instance.new("UICorner")
+downCorner.CornerRadius = UDim.new(0,8)
+downCorner.Parent = downButton
+
+--------------------------------------------------
+-- STATUS
+--------------------------------------------------
+
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(0,130,0,30)
+status.Position = UDim2.new(1,-140,0,318)
+status.BackgroundTransparency = 1
+status.Text = "FLY: OFF"
+status.TextColor3 = Color3.fromRGB(255,100,100)
+status.Font = Enum.Font.GothamBold
+status.TextSize = 12
+status.Parent = main
+
+--------------------------------------------------
+-- COORDENADAS
+--------------------------------------------------
+
+task.spawn(function()
+
+    while gui.Parent do
+
+        task.wait(.1)
+
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+
+        if root then
+
+            local p = root.Position
+
+            lastCoordinate = string.format(
+                "X: %.2f | Y: %.2f | Z: %.2f",
+                p.X,
+                p.Y,
+                p.Z
+            )
+
+            current.Text = lastCoordinate
+
+        end
+    end
+
+end)
+
+--------------------------------------------------
+-- GRAVAR
+--------------------------------------------------
+
+save.MouseButton1Click:Connect(function()
+
+    if lastCoordinate ~= "" then
+
+        savedCoordinate = lastCoordinate
+
+        saved.Text =
+            "SALVA:\n" ..
+            savedCoordinate
+
+        save.Text = "✓ GRAVADO"
+
+        task.delay(1,function()
+
+            if save then
+                save.Text = "💾 GRAVAR"
+            end
+
+        end)
+
+    end
+
+end)
+
+--------------------------------------------------
+-- COPY COORDENADA
+--------------------------------------------------
+
+copy.MouseButton1Click:Connect(function()
+
+    if savedCoordinate ~= "" and setclipboard then
+
+        setclipboard(savedCoordinate)
+
+        copy.Text = "✓ COPIADO"
+
+        task.delay(1,function()
+
+            if copy then
+                copy.Text = "📋 COPY"
+            end
+
+        end)
+
+    end
+
+end)
+
+--------------------------------------------------
+-- RAYCAST DO CLICK
+--------------------------------------------------
+
+local function getClickPosition(x,y)
+
+    local ray = camera:ViewportPointToRay(x,y)
+
+    local params = RaycastParams.new()
+
+    params.FilterType = Enum.RaycastFilterType.Exclude
+
+    if player.Character then
+        params.FilterDescendantsInstances = {
+            player.Character
+        }
+    end
+
+    local result = workspace:Raycast(
+        ray.Origin,
+        ray.Direction * 2000,
+        params
+    )
+
+    if result then
+        return result.Position
+    end
+
+end
+
+--------------------------------------------------
+-- MODO CLICK
+--------------------------------------------------
+
+clickButton.MouseButton1Click:Connect(function()
+
+    clickMode = not clickMode
+
+    if clickMode then
+
+        clickButton.Text = "📍 CLICK: ON"
+        clickButton.BackgroundColor3 =
+            Color3.fromRGB(50,180,100)
+
+    else
+
+        clickButton.Text = "📍 CLICK"
+        clickButton.BackgroundColor3 =
+            Color3.fromRGB(140,80,210)
+
+    end
+
+end)
+
+--------------------------------------------------
+-- CAPTURAR CLICK/TOQUE
+--------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input,processed)
+
+    if processed then
+        return
+    end
+
+    if not clickMode then
+        return
+    end
+
+    if input.UserInputType ==
+        Enum.UserInputType.MouseButton1
+        or input.UserInputType ==
+        Enum.UserInputType.Touch then
+
+        local pos = input.Position
+
+        local point = getClickPosition(
+            pos.X,
+            pos.Y
+        )
+
+        if point then
+
+            clickedCoordinate =
+                string.format(
+                    "X: %.2f | Y: %.2f | Z: %.2f",
+                    point.X,
+                    point.Y,
+                    point.Z
+                )
+
+            clickedLabel.Text =
+                "CLICK:\n" ..
+                clickedCoordinate
+
+        end
+
+    end
+
+end)
+
+--------------------------------------------------
+-- COPY CLICK
+--------------------------------------------------
+
+clickCopy.MouseButton1Click:Connect(function()
+
+    if clickedCoordinate ~= "" and setclipboard then
+
+        setclipboard(clickedCoordinate)
+
+        clickCopy.Text = "✓ COPIADO"
+
+        task.delay(1,function()
+
+            if clickCopy then
+                clickCopy.Text = "📋 COPY CLICK"
+            end
+
+        end)
+
+    end
+
+end)
+
+--------------------------------------------------
+-- SUBIR
+--------------------------------------------------
+
+upButton.MouseButton1Down:Connect(function()
+    vertical = 1
+end)
+
+upButton.MouseButton1Up:Connect(function()
+    vertical = 0
+end)
+
+--------------------------------------------------
+-- DESCER
+--------------------------------------------------
+
+downButton.MouseButton1Down:Connect(function()
+    vertical = -1
+end)
+
+downButton.MouseButton1Up:Connect(function()
+    vertical = 0
+end)
+
+--------------------------------------------------
+-- FLY
+--------------------------------------------------
+
+local function startFly()
+
+    if flying then
+        return
+    end
+
+    local char = player.Character
+    if not char then
+        return
+    end
+
+    local root =
+        char:FindFirstChild("HumanoidRootPart")
+
+    local humanoid =
+        char:FindFirstChildOfClass("Humanoid")
+
+    if not root or not humanoid then
+        return
+    end
+
+    flying = true
+
+    status.Text = "FLY: ON"
+    status.TextColor3 =
+        Color3.fromRGB(80,255,120)
+
+    bodyVelocity = Instance.new("BodyVelocity")
+
+    bodyVelocity.MaxForce =
+        Vector3.new(
+            math.huge,
+            math.huge,
+            math.huge
+        )
+
+    bodyVelocity.P = 50000
+    bodyVelocity.Velocity = Vector3.zero
+    bodyVelocity.Parent = root
+
+    bodyGyro = Instance.new("BodyGyro")
+
+    bodyGyro.MaxTorque =
+        Vector3.new(
+            math.huge,
+            math.huge,
+            math.huge
+        )
+
+    bodyGyro.P = 50000
+    bodyGyro.D = 1000
+    bodyGyro.CFrame = root.CFrame
+    bodyGyro.Parent = root
+
+    flyConnection =
+        RunService.RenderStepped:Connect(function()
+
+            if not flying or not root.Parent then
+                return
+            end
+
+            local move =
+                humanoid.MoveDirection
+
+            local velocity =
+                move * flySpeed
+
+            -- Subir / descer
+            velocity =
+                velocity +
+                Vector3.new(
+                    0,
+                    vertical * flySpeed,
+                    0
+                )
+
+            bodyVelocity.Velocity =
+                velocity
+
+            -- Virar para a direção do movimento
+            if move.Magnitude > .05 then
+
+                bodyGyro.CFrame =
+                    CFrame.lookAt(
+                        root.Position,
+                        root.Position + move
+                    )
+
+            end
+
+        end)
+
+end
+
+--------------------------------------------------
+-- PARAR FLY
+--------------------------------------------------
+
+local function stopFly()
+
+    flying = false
+    vertical = 0
+
+    status.Text = "FLY: OFF"
+    status.TextColor3 =
+        Color3.fromRGB(255,100,100)
+
+    if flyConnection then
+
+        flyConnection:Disconnect()
+        flyConnection = nil
+
+    end
+
+    if bodyVelocity then
+
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+
+    end
+
+    if bodyGyro then
+
+        bodyGyro:Destroy()
+        bodyGyro = nil
+
+    end
+
+end
+
+--------------------------------------------------
+-- BOTÕES
+--------------------------------------------------
+
+flyButton.MouseButton1Click:Connect(startFly)
+stopButton.MouseButton1Click:Connect(stopFly)
+
+--------------------------------------------------
+-- RESPAWN
+--------------------------------------------------
+
+player.CharacterAdded:Connect(function()
+
+    stopFly()
+
+end)
