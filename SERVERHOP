@@ -1,0 +1,362 @@
+--[[
+    PLAY SERVER HOP
+    👤 1 JOGADOR
+    👥 POUCOS JOGADORES
+    🧑‍🤝‍🧑 MUITOS JOGADORES
+]]
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local PlaceId = game.PlaceId
+
+-- CONFIG
+local POUCOS_MAX = 5
+local MUITOS_MIN = 10
+
+-- GUI
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "PlayServerHop"
+Gui.ResetOnSpawn = false
+Gui.Parent = Player:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 315, 0, 300)
+Main.Position = UDim2.new(0.5, -157, 0.5, -150)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Parent = Gui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0,12)
+Corner.Parent = Main
+
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(255,0,0)
+Stroke.Thickness = 2
+Stroke.Parent = Main
+
+-- TÍTULO
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,-60,0,40)
+Title.Position = UDim2.new(0,15,0,8)
+Title.BackgroundTransparency = 1
+Title.Text = "PLAY SERVER HOP"
+Title.TextColor3 = Color3.fromRGB(255,255,255)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Main
+
+-- FECHAR
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.new(0,30,0,30)
+Close.Position = UDim2.new(1,-40,0,10)
+Close.BackgroundColor3 = Color3.fromRGB(45,45,45)
+Close.Text = "X"
+Close.TextColor3 = Color3.fromRGB(255,255,255)
+Close.TextSize = 14
+Close.Font = Enum.Font.GothamBold
+Close.Parent = Main
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(1,0)
+CloseCorner.Parent = Close
+
+Close.MouseButton1Click:Connect(function()
+	Gui:Destroy()
+end)
+
+-- STATUS
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1,-30,0,38)
+Status.Position = UDim2.new(0,15,0,50)
+Status.BackgroundTransparency = 1
+Status.Text = "Escolha um servidor"
+Status.TextColor3 = Color3.fromRGB(180,180,180)
+Status.TextSize = 13
+Status.Font = Enum.Font.Gotham
+Status.Parent = Main
+
+-- BOTÃO
+local function CreateButton(Text, Y)
+
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.new(1,-30,0,45)
+	Button.Position = UDim2.new(0,15,0,Y)
+	Button.BackgroundColor3 = Color3.fromRGB(145,0,0)
+	Button.BorderSizePixel = 0
+	Button.Text = Text
+	Button.TextColor3 = Color3.fromRGB(255,255,255)
+	Button.TextSize = 14
+	Button.Font = Enum.Font.GothamBold
+	Button.Parent = Main
+
+	local C = Instance.new("UICorner")
+	C.CornerRadius = UDim.new(0,9)
+	C.Parent = Button
+
+	return Button
+end
+
+-- 3 BOTÕES
+local OneButton = CreateButton(
+	"👤  ENTRAR COM 1 JOGADOR",
+	95
+)
+
+local FewButton = CreateButton(
+	"👥  ENTRAR COM POUCOS",
+	150
+)
+
+local ManyButton = CreateButton(
+	"🧑‍🤝‍🧑  ENTRAR COM MUITOS",
+	205
+)
+
+-- RODAPÉ
+local Footer = Instance.new("TextLabel")
+Footer.Size = UDim2.new(1,-30,0,25)
+Footer.Position = UDim2.new(0,15,1,-30)
+Footer.BackgroundTransparency = 1
+Footer.Text = "PLAY • Server Hop"
+Footer.TextColor3 = Color3.fromRGB(110,110,110)
+Footer.TextSize = 11
+Footer.Font = Enum.Font.Gotham
+Footer.Parent = Main
+
+-- BUSCAR SERVIDORES
+local function GetServers()
+
+	local Servers = {}
+	local Cursor = ""
+
+	for Page = 1,3 do
+
+		local URL =
+			"https://games.roblox.com/v1/games/"
+			.. PlaceId
+			.. "/servers/Public?sortOrder=Desc&limit=100"
+
+		if Cursor ~= "" then
+			URL = URL .. "&cursor=" .. HttpService:UrlEncode(Cursor)
+		end
+
+		local Success, Response = pcall(function()
+			return game:HttpGet(URL)
+		end)
+
+		if not Success then
+			return nil
+		end
+
+		local OK, Data = pcall(function()
+			return HttpService:JSONDecode(Response)
+		end)
+
+		if not OK or not Data then
+			return nil
+		end
+
+		for _, Server in ipairs(Data.data or {}) do
+
+			if Server.id ~= game.JobId
+			and Server.playing
+			and Server.maxPlayers
+			and Server.playing < Server.maxPlayers then
+
+				table.insert(Servers,Server)
+
+			end
+		end
+
+		Cursor = Data.nextPageCursor
+
+		if not Cursor then
+			break
+		end
+	end
+
+	return Servers
+end
+
+-- ENCONTRAR SERVIDOR
+local function FindServer(Mode)
+
+	Status.Text = "🔎 Procurando servidor..."
+
+	OneButton.Active = false
+	FewButton.Active = false
+	ManyButton.Active = false
+
+	local Servers = GetServers()
+
+	if not Servers then
+
+		Status.Text = "❌ Erro ao buscar servidores."
+
+		OneButton.Active = true
+		FewButton.Active = true
+		ManyButton.Active = true
+
+		return
+	end
+
+	local Selected = nil
+
+	-- 1 JOGADOR
+	if Mode == "One" then
+
+		for _,Server in ipairs(Servers) do
+
+			if Server.playing == 1 then
+				Selected = Server
+				break
+			end
+
+		end
+
+	-- POUCOS
+	elseif Mode == "Few" then
+
+		local Lowest = math.huge
+
+		for _,Server in ipairs(Servers) do
+
+			if Server.playing <= POUCOS_MAX
+			and Server.playing < Lowest then
+
+				Lowest = Server.playing
+				Selected = Server
+
+			end
+
+		end
+
+	-- MUITOS
+	elseif Mode == "Many" then
+
+		local Highest = -1
+
+		for _,Server in ipairs(Servers) do
+
+			if Server.playing >= MUITOS_MIN
+			and Server.playing > Highest then
+
+				Highest = Server.playing
+				Selected = Server
+
+			end
+
+		end
+	end
+
+	-- NÃO ENCONTROU
+	if not Selected then
+
+		if Mode == "One" then
+			Status.Text = "⚠️ Nenhum servidor com exatamente 1 jogador."
+
+		elseif Mode == "Few" then
+			Status.Text = "⚠️ Nenhum servidor com poucos jogadores."
+
+		else
+			Status.Text = "⚠️ Nenhum servidor com muitos jogadores."
+		end
+
+		OneButton.Active = true
+		FewButton.Active = true
+		ManyButton.Active = true
+
+		return
+	end
+
+	-- TELEPORTAR
+	Status.Text =
+		"🚀 Entrando... "
+		.. tostring(Selected.playing)
+		.. " jogador(es)"
+
+	task.wait(0.5)
+
+	local Success = pcall(function()
+
+		TeleportService:TeleportToPlaceInstance(
+			PlaceId,
+			Selected.id,
+			Player
+		)
+
+	end)
+
+	if not Success then
+
+		Status.Text = "❌ Falha no teleporte."
+
+		OneButton.Active = true
+		FewButton.Active = true
+		ManyButton.Active = true
+
+	end
+end
+
+-- CLIQUES
+OneButton.MouseButton1Click:Connect(function()
+	FindServer("One")
+end)
+
+FewButton.MouseButton1Click:Connect(function()
+	FindServer("Few")
+end)
+
+ManyButton.MouseButton1Click:Connect(function()
+	FindServer("Many")
+end)
+
+-- DRAG MOBILE / PC
+local Dragging = false
+local DragStart
+local StartPosition
+
+Main.InputBegan:Connect(function(Input)
+
+	if Input.UserInputType == Enum.UserInputType.MouseButton1
+	or Input.UserInputType == Enum.UserInputType.Touch then
+
+		Dragging = true
+		DragStart = Input.Position
+		StartPosition = Main.Position
+
+		Input.Changed:Connect(function()
+
+			if Input.UserInputState == Enum.UserInputState.End then
+				Dragging = false
+			end
+
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(Input)
+
+	if Dragging
+	and (
+		Input.UserInputType == Enum.UserInputType.MouseMovement
+		or Input.UserInputType == Enum.UserInputType.Touch
+	) then
+
+		local Delta = Input.Position - DragStart
+
+		Main.Position = UDim2.new(
+			StartPosition.X.Scale,
+			StartPosition.X.Offset + Delta.X,
+			StartPosition.Y.Scale,
+			StartPosition.Y.Offset + Delta.Y
+		)
+	end
+end)
